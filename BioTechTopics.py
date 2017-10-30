@@ -47,11 +47,11 @@ class Topics(object):
         self.calcWordCloudText(25)
         
         # set the wordcloud titles
-        self.topic_titles=['Topic 0','Topic 1','Topic 2','Topic 3','Topic 4','Topic 5','Topic 6','Topic 7','Topic 8','Topic 9',]
+        self.topic_titles=['Blood tests and healthcare payers','Microbiome and Bacteria','New Drugs','Clinical Drug Development','Immunotherapies',' ','Health Data',' ','Devices and Diagnostics','Topic 9',]
     
         print '\nTopics instance ready'
     # code from https://github.com/amueller/word_cloud/blob/master/examples/simple.py
-    def showTopicWordCloud(self,topic_number):
+    def showTopicWordCloud(self,topic_number,fs=(6,4)):
         
         if topic_number<0:
             topic_number=0
@@ -61,8 +61,8 @@ class Topics(object):
         # Generate a word cloud image
         wordcloud = WordCloud(max_words=self.n_top_words).generate(self.topic_words_text[topic_number])
         
-        # Display the generated image:
-        # the matplotlib way:
+        # Display the image:
+        plt.figure(figsize=fs)
         plt.imshow(wordcloud, interpolation='bilinear')
         plt.axis("off")
         plt.title(self.topic_titles[topic_number])
@@ -76,10 +76,11 @@ class Topics(object):
     
     def printTopWords(self,n_top_words): #from scikit-learn.org
         for topic_idx, topic in enumerate(self.lda.components_):
-            message = "Topic #%d: " % topic_idx
+            message = "Topic #%d: " % topic_idx 
+            message+= " " + self.topic_titles[topic_idx].upper() + ": "
             message += ", ".join([self.feature_names[i]
                                  for i in topic.argsort()[:-n_top_words - 1:-1]])
-            print(message)
+            print("\n" + message)
         print()
     
     def calcWordCloudText(self,n_top_words):
