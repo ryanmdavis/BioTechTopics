@@ -11,6 +11,8 @@ import operator
 import itertools
 import pandas as pd
 import time
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 class Topics(object):
     
@@ -22,18 +24,47 @@ class Topics(object):
         
         # train count vectorizer to do LDA
         start = time.time()
-        print 'Training Count Vectorizer'
+        print '\nTraining Count Vectorizer'
         self.tf, self.tf_vectorizer, self.feature_names=self.trainCountVectorizer(self.text_list)
         end = time.time()
         print 'Done training after ' + str(end-start) + ' seconds'
         
-    def performLDA(self,n_components):
+        # LDA
         start = time.time()
-        print('Started training LDA model')
+        print '\nTraining LDA probability distributions'
+        self.performLDA(25)
+        end = time.time()
+        print 'Done training after ' + str(end-start) + ' seconds'
+        
+        # calculate wordclout text for topics
+        self.calcWordCloudText(10)
+        
+        # set the wordcloud titles
+        self.topic_titles=['Topic 0','Topic 1','Topic 2','Topic 3','Topic 4','Topic 5','Topic 6','Topic 7','Topic 8','Topic 9',]
+    
+        print 'Topics instance ready'
+    # code from https://github.com/amueller/word_cloud/blob/master/examples/simple.py
+    def showWordCloud(self,topic_number):
+        
+        if topic_number<0:
+            topic_number=0
+        elif topic_number>len(self.topic_words_text)-1:
+            topic_number=len(self.topic_words_text)-1         
+        
+        # Generate a word cloud image
+        wordcloud = WordCloud(max_words=self.n_top_words).generate(self.topic_words_text[topic_number])
+        
+        # Display the generated image:
+        # the matplotlib way:
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis("off")
+        plt.title(self.topic_titles[topic_number])
+        plt.show()
+         
+        
+    def performLDA(self,n_components):
         self.lda = LatentDirichletAllocation(n_components, max_iter=30, learning_method='online', learning_offset=50., random_state=0)
         self.lda.fit(self.tf)
-        end = time.time()
-        print('Finished training LDA model after ') + str(end-start) + ' seconds'
     
     def printTopWords(self,n_top_words): #from scikit-learn.org
         for topic_idx, topic in enumerate(self.lda.components_):
@@ -43,14 +74,22 @@ class Topics(object):
             print(message)
         print()
     
-    def showWordCloud(self,n_top_words):
+    def calcWordCloudText(self,n_top_words):
+        topic_words_text=[]
         for topic_idx, topic in enumerate(self.lda.components_):
-            message = "Topic #%d: " % topic_idx
-            message += ", ".join([self.feature_names[i]
-                                 for i in topic.argsort()[:-n_top_words - 1:-1]])
-            print(message)
-        print()
-    
+            topic_words = [self.feature_names[i] for i in topic.argsort()[:-n_top_words - 1:-1]]
+            
+            # take the matrix product of the term-doc matrix and the vector representation of each topic word.
+            # Sum the resulting vector to get the word count
+            topic_word_frequency = [sum(np.dot(self.tf,self.tf_vectorizer.transform([topic_word]).transpose()))[0,0] for topic_word in topic_words]
+            
+            text=''
+            for tw_num in range(len(topic_words)):
+                text = text + (topic_words[tw_num] + ' ')*topic_word_frequency[tw_num]
+            topic_words_text.append(text)
+        self.topic_words_text = topic_words_text
+        self.n_top_words=n_top_words
+        
     def stemKeywords(self,keyword_list):
         stemmer=PorterStemmer()
         for doc_num in range(len(keyword_list)):
@@ -63,7 +102,7 @@ class Topics(object):
         # parse all of the JSON objects in the file.
         text_df = pd.read_json(json_file_loc)
         cleanString = lambda x:x.lower().encode('ascii','ignore').translate(None, string.punctuation).replace('\n', ' ').replace('\r', ' ')
-        text_body=text_df['text_body'].apply(cleanString)
+        text_body=list(text_df['text_body'].apply(cleanString))[0:100]
         raw_text_body=list(text_df['text_body'])
         text_keywords=list(text_df['keywords'])
         return text_body, raw_text_body, text_keywords
@@ -88,7 +127,7 @@ class Topics(object):
     
     def trainCountVectorizer(self,text_list):
                     
-        tf_vectorizer = CountVectorizer(tokenizer=self.tokenizeAndStemStrings, stop_words='english',ngram_range=(1,2))        
+        tf_vectorizer = CountVectorizer(tokenizer=self.tokenizeAndStemStrings, stop_words='english',ngram_range=(1,2),max_df=0.95, min_df=2) #max_features=100        
         tf = tf_vectorizer.fit_transform(text_list)
         feature_names=tf_vectorizer.get_feature_names()
     
