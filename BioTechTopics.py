@@ -44,7 +44,7 @@ class Topics(object):
         sys.stdout.write("|")
         
         # allocate some memory for new data frame
-        new_df= pd.DataFrame({'TR_keywords':['']*df_len,'TR_keyword_scores':['']*df_len,'year':['']*df_len,'month':['']*df_len,'NE':['']*df_len,'FBT_keywords':['']*df_len,'doc_num':['']*df_len,'author':['']*df_len})
+        new_df= pd.DataFrame({'TR_keywords':['']*df_len,'TR_keyword_scores':['']*df_len,'year':['']*df_len,'month':['']*df_len,'NE':['']*df_len,'FBT_keywords':['']*df_len,'doc_num':['']*df_len,'author':['']*df_len,'title':['']*df_len})
         for doc_num in range(len(self.text_df)):
             if doc_num>docs_per_dash*dash_num:
                 sys.stdout.write("-")
@@ -64,11 +64,12 @@ class Topics(object):
                 new_df['TR_keywords'][doc_num]=','.join([scored_kw_phrases[x][0] for x in range(len(scored_kw_phrases))])
                 new_df['TR_keyword_scores'][doc_num]=','.join([str(scored_kw_phrases[x][1]) for x in range(len(scored_kw_phrases))])
                 new_df['NE'][doc_num]=','.join(ne_list)
-                new_df['year'][doc_num]=float(str(self.text_df['date'][doc_num])[0:4])#+float(str(self.text_df['date'][doc_num])[5:7])/12.
                 new_df['FBT_keywords'][doc_num]=','.join(self.text_df['keywords'][doc_num]).replace(' ','_')
                 new_df['doc_num'][doc_num]=doc_num
                 new_df['month'][doc_num]=str(self.text_df['date'][doc_num])[5:7]
                 new_df['author'][doc_num]=self.text_df['author'][doc_num]
+                new_df['year'][doc_num]=float(str(self.text_df['date'][doc_num])[0:4])+float(str(self.text_df['date'][doc_num])[5:7])/12.+float(str(self.text_df['date'][doc_num])[8:10])/30
+                new_df['title'][doc_num]=self.text_df['title'][doc_num]
             except:
                 new_df['TR_keywords'][doc_num]=''
                 new_df['TR_keyword_scores'][doc_num]=''
@@ -78,6 +79,7 @@ class Topics(object):
                 new_df['doc_num'][doc_num]=doc_num
                 new_df['month'][doc_num]=''
                 new_df['author'][doc_num]=''
+                new_df['title'][doc_num]=''
                 print "Error at document number " + str(doc_num)
                 print("\nProgress:\n|" + "-"*num_dashes + "|")
                 sys.stdout.write("|")
@@ -148,7 +150,7 @@ class Topics(object):
     
     def getText(self,json_file_loc='./data/all_reports.json'):
         # parse all of the JSON objects in the file.
-        self.text_df = pd.read_json(json_file_loc)[0:1000]
+        self.text_df = pd.read_json(json_file_loc)
         print 'Corpus contains ' + str(self.text_df.shape[0]) + ' unique files'
     
     def tokenizeAndStemStrings(self,text):
@@ -465,77 +467,14 @@ class Topics(object):
         with open('./data/lda.p', 'r') as f:
             self.lda=pickle.load(f)
         
-        # load keywords and named entities 
-        self.processed_df = pd.read_json('./data/all_reports_processed.json')  
-        # convert year to integers
-        has_year=self.processed_df['year']!=u''
-        self.processed_df.loc[has_year,'year']=self.processed_df.loc[has_year,'year'].astype('int32')
-        self.processed_df.loc[~has_year,'year']=0
-
-        pass
-
+        # load keywords and named entities
+        #loc2='/home/ryan/Documents/FBT_corpus/processed-11-11-17.json'
+        loc1='./data/all_reports_processed2.json'
+        self.processed_df = pd.read_json(loc1)
+        
+        print "Corpus has %s documents" % len(self.processed_df)
+  
     ## WhosWho? function.  Uses keyword extraction, named entity recognition, and tfidf information retrieval to 
-    ## Identify prominent individuals relevant to a user's query    
-    def ww(self,query,kw_algorithm='tfidf'):
-        
-        ## set default ascii encoding
-        reload(sys)
-        sys.setdefaultencoding('utf8')
-        
-        ## define grammars
-        g1='{(<JJ>* <NN.*>+<IN>)? <JJ>* <NN.*>+}'
-        g2='{<NN.*|JJ>}'
-        g3='{<NN.*>}'
-        grammar_tf=g1
-        doc_num=0
-        
-        ## find the most relevant documents by using a tfidf search of the corpus for the query
-        ## the algorithm only consider's documents that have a cosine_similarity greater than one tenth of the maximum cos_sim
-        ## this ensures that we don't consider documents of minimal relevance.
-        response=self.tfidf_vectorizer.transform([query])
-        cosine_similarities = linear_kernel(self.tfidf, response).flatten() #flatten collapses into one dimension
-        sorted_cs_arg=cosine_similarities.argsort()[::-1]
-        sorted_cosine_similarities=cosine_similarities[sorted_cs_arg]
-        top_docs_indicies=[sorted_cs_arg[x] for x in range(len(sorted_cosine_similarities)) if sorted_cosine_similarities[x]>sorted_cosine_similarities[0]/10]
-        top_docs=self.text_df[['text_body','date']]
-        print 'Found ' + str(len(top_docs)) + ' documents relevant to query "' + query + '"'
-
-        ## extract keywords from the top 10 matches from the tfidf query
-        if kw_algorithm=='textrank':
-            num_kw_dict={str(index):20 for index in top_docs_indicies}
-            # find the top 10 keywords of each document by textrank
-            keyword_list = self.getKeywordsByTextRank(num_kw_dict, top_docs_indicies, syntactic_filter='Filt: {<NN.*>}')
-        else:
-            # find the top 10 keywords of each document by tf-idf
-            regexp_list,num_regexp_list = self.getRegExps('KW: '+grammar_tf,top_docs_indicies)
-            #top_docs_regexp=[self.regexp_list[x] for x in top_docs_indicies]
-            keyword_list = self.getKeywordsByTfidf(regexp_list, [10]*len(regexp_list))
-        
-        ## find the named entities for each document
-        # remove characters that can't be encoded to ascii
-        whos_who=[]
-        for kw_index,doc_index in enumerate(top_docs_indicies):
-            #ascii_compatible = self.raw_text_list[top_docs_indicies[0]].encode('utf-8','ignore').decode('utf-8')
-            tokens = nltk.word_tokenize(self.text_df['text_body'][doc_index].encode('utf-8','ignore').decode('utf-8'))
-            tagged = nltk.pos_tag(tokens)
-            ne_list=self.ne(tagged) #named entities
-            np_list=self.nps(tagged) #noun phrases
-            ne_list_no_dup=self.intersectAndCleanNeNp(ne_list,np_list,keyword_list[kw_index])                    
-            whos_who=whos_who+ne_list_no_dup
-        #problem ne_chunk_sents requires all tokens to be in a phrase (Which I can't do)
-        #ne_chunk doesn't let me choose the chunk grammar
-        #solution: use ne_chunk to find the ne, and use REgexpParser to give the grammars to find the full noun phrases
-        
-        whos_who=[word for word in list(whos_who) if query.lower() not in word.lower()]
-        if not bool(whos_who):
-            print('Unfortunately there are no key people in the corpus matching the query '+query)
-        else:
-            self.showWhosWhoWordCloud(whos_who,query)
-            #print 'Who''s who for the query "' + query + '":'
-            #print(whos_who)
-        return whos_who    
-    
- ## WhosWho? function.  Uses keyword extraction, named entity recognition, and tfidf information retrieval to 
     ## Identify prominent individuals relevant to a user's query    
     def ww2(self,query):
         
@@ -582,56 +521,71 @@ class Topics(object):
         top_docs_nonempty = top_docs[top_docs['year']>0]
         years=[str(year) for year in set(top_docs_nonempty['year'])]
         kw_score_dict={}
-        for year in years:
-            docs_year=top_docs[top_docs['year']==int(year)]
-            keyword_list_all=[]
-            keyword_scores_list_all=[]
-            
-            
-            
-            # make list of keywords
-            keyword_list=list(docs_year['TR_keywords'])
-            keyword_list=[keyword_list[x].replace('_',' ').split(',') for x in range(len(keyword_list))]
-            keyword_list_all.extend(list(itertools.chain.from_iterable(keyword_list)))
-            
-            #make list of keyword scores
-            keyword_scores_list=list(docs_year['TR_keyword_scores'])
-            keyword_scores_list_split=[keyword_scores_list[x].replace('_',' ').split(',') for x in range(len(keyword_scores_list))]
-            #keyword_scores_list_all_unicode=list(itertools.chain.from_iterable(keyword_scores_list_split))
-            keyword_scores_list_all=[float(score) if len(score)>0 else 0 for score in list(itertools.chain.from_iterable(keyword_scores_list_split))]
-            #keyword_scores_list_all.extend([float(score) for score in list(itertools.chain.from_iterable(keyword_scores_list))])
-            
-            doc_score_list_all=[]
-            this_year_doc_indicies=list(docs_year['doc_num'])
-            for doc_num in range(len(docs_year)):
-                doc_score_list_all.extend([cosine_similarities[this_year_doc_indicies[doc_num]]]*len(keyword_list[doc_num]))
-                #make list of keyword scores 
-            
-            month = list(docs_yaer['month'])
-              
-            kw_score_dict[str(year)]=zip(keyword_list_all,keyword_scores_list_all,doc_score_list_all)
-        print 'Found ' + str(len(top_docs)) + ' documents relevant to query "' + query + '"'
         
-        self.search_results=kw_score_dict
-        return kw_score_dict           
+        # generate list of keywords
+        keyword_list=list(top_docs_nonempty['TR_keywords'])
+        keyword_list=[keyword_list[x].replace('_',' ').split(',') for x in range(len(keyword_list))]
+        keyword_list_all=list(itertools.chain.from_iterable(keyword_list))
+        
+        #make list of keyword scores
+        keyword_scores_list=list(top_docs_nonempty['TR_keyword_scores'])
+        keyword_scores_list_split=[keyword_scores_list[x].replace('_',' ').split(',') for x in range(len(keyword_scores_list))]
+        keyword_scores_list_split=list(itertools.chain.from_iterable(keyword_scores_list_split))
+        #keyword_scores_list=[keyword_scores_list[i] if bool(keyword_scores_list[i]) else u'0' for i in range(len(keyword_scores_list))]
+        keyword_scores_array=np.array([float(keyword_scores_list_split[i]) if bool(keyword_scores_list_split[i]) else 0. for i in range(len(keyword_scores_list_split))])
+           
+        # generate array of years    
+        year_list=list(itertools.chain.from_iterable([[float(month)/12+float(year)]*len(keyword_list[doc_index]) for (month,year,doc_index) in zip(list(top_docs_nonempty['month']),list(top_docs_nonempty['year']),range(len(top_docs_nonempty)))]))
+        year_array=np.round(np.array(year_list),2)
+        
+        # generate list of tf-idf scores
+        all_doc_indicies=list(top_docs_nonempty['doc_num'])
+        doc_score_list=[[cosine_similarities[all_doc_indicies[doc_index]]]*len(keyword_list[doc_index]) for doc_index in range(len(all_doc_indicies))]
+        doc_tfidf_score_array=np.array(list(itertools.chain.from_iterable(doc_score_list)))
+        
+        # double check later, but I probably don't need to loop through the years like this
+#         for year in years:
+#             docs_year=top_docs[top_docs['year']==int(year)]
+#             keyword_list_all=[]
+#             keyword_scores_list_all=[]
+#             
+#             
+#             
+#             # make list of keywords
+#             keyword_list=list(docs_year['TR_keywords'])
+#             keyword_list=[keyword_list[x].replace('_',' ').split(',') for x in range(len(keyword_list))]
+#             keyword_list_all.extend(list(itertools.chain.from_iterable(keyword_list)))
+#             
+#             #make list of keyword scores
+#             keyword_scores_list=list(docs_year['TR_keyword_scores'])
+#             keyword_scores_list_split=[keyword_scores_list[x].replace('_',' ').split(',') for x in range(len(keyword_scores_list))]
+#             #keyword_scores_list_all_unicode=list(itertools.chain.from_iterable(keyword_scores_list_split))
+#             keyword_scores_list_all=[float(score) if len(score)>0 else 0 for score in list(itertools.chain.from_iterable(keyword_scores_list_split))]
+#             #keyword_scores_list_all.extend([float(score) for score in list(itertools.chain.from_iterable(keyword_scores_list))])
+#             
+#             doc_score_list_all=[]
+#             this_year_doc_indicies=list(docs_year['doc_num'])
+#             for doc_num in range(len(docs_year)):
+#                 doc_score_list_all.extend([cosine_similarities[this_year_doc_indicies[doc_num]]]*len(keyword_list[doc_num]))
+#                 #make list of keyword scores 
+#             
+#             month_list = list(docs_year['month'])
+#             year_list.extend(np.array([float(month) for month in month_list])/12.+float(year))
+              
+        print 'Found ' + str(len(top_docs)) + ' documents relevant to query "' + query + '"' 
+        #self.search_results=zip(year_list,keyword_list_all,keyword_scores_array,doc_tfidf_score_array)
+        self.search_results={'year': year_list, 'keywords': keyword_list_all,'TR_score':keyword_scores_array,'tfidf_score':doc_tfidf_score_array}
+                  
 
     def formatSearchResults(self,format='tfidf_tf_product'):
         
         if format == 'tfidf_tf_product':
             
-            data = {'year': [], 'total_score': [], 'keyword': [],'tr_score':[],'tfidf_score':[]}
-            year_values=self.search_results.keys()
-            
             # make a list of years that each keyword was cited
-            data['year']=np.array(list(itertools.chain.from_iterable([[int(year)]*len(self.search_results[year]) for year in year_values])))
-            
-            # make a list of textrank and tfidf scores for each data point
-            data['tr_score']=np.array(list(itertools.chain.from_iterable([[self.search_results[year][kw_num][1] for kw_num in range(len(self.search_results[year]))] for year in year_values])))
-            data['tfidf_score']=np.array(list(itertools.chain.from_iterable([[self.search_results[year][kw_num][2] for kw_num in range(len(self.search_results[year]))] for year in year_values])))
-            data['keyword']=np.array(list(itertools.chain.from_iterable([[self.search_results[year][kw_num][0] for kw_num in range(len(self.search_results[year]))] for year in year_values])))
-            
-            #make a list of scores (tfidf score)*(textrank score) for each keyword
-            data['total_score']=np.multiply(data['tr_score'],data['tfidf_score'])
+            data=self.search_results
+
+            #make a list of scores 100*(tfidf score)*(textrank score)/max for each keyword
+            data['total_score']=100*np.multiply(data['TR_score'],data['tfidf_score'])/(data['TR_score'].max()*data['tfidf_score'].max())
 
         return data
         
