@@ -68,7 +68,7 @@ class Topics(object):
                 new_df['doc_num'][doc_num]=doc_num
                 new_df['month'][doc_num]=str(self.text_df['date'][doc_num])[5:7]
                 new_df['author'][doc_num]=self.text_df['author'][doc_num]
-                new_df['year'][doc_num]=float(str(self.text_df['date'][doc_num])[0:4])+float(str(self.text_df['date'][doc_num])[5:7])/12.+float(str(self.text_df['date'][doc_num])[8:10])/30
+                new_df['year'][doc_num]=float(str(self.text_df['date'][doc_num])[0:4])+float(str(self.text_df['date'][doc_num])[5:7])/12.+float(str(self.text_df['date'][doc_num])[8:10])/365
                 new_df['title'][doc_num]=self.text_df['title'][doc_num]
             except:
                 new_df['TR_keywords'][doc_num]=''
@@ -86,7 +86,7 @@ class Topics(object):
                 dash_num+=1
                 sys.stdout.write("-"*dash_num)
         sys.stdout.write("|\n")
-        new_df.to_json('/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports_processed2.json')
+        new_df.to_json(save_file_loc)
         
     def showTopicWordCloud(self,topic_number,fs=(6,4)):
         
@@ -148,9 +148,12 @@ class Topics(object):
                 pass
         return keyword_list
     
-    def getText(self,json_file_loc='./data/all_reports.json'):
+    def getText(self,json_file_loc='./data/all_reports.json',num_files=0):
         # parse all of the JSON objects in the file.
-        self.text_df = pd.read_json(json_file_loc)
+        if not bool(num_files):
+            self.text_df = pd.read_json(json_file_loc)
+        else:
+            self.text_df = pd.read_json(json_file_loc)[0:num_files]
         print 'Corpus contains ' + str(self.text_df.shape[0]) + ' unique files'
     
     def tokenizeAndStemStrings(self,text):
@@ -179,7 +182,7 @@ class Topics(object):
     
     def createTfidfTable(self):
                     
-        tfidf_vectorizer = TfidfVectorizer(tokenizer=self.tokenizeAndStemStrings, stop_words='english',ngram_range=(1,4), use_idf=True, smooth_idf = False, norm=None)
+        tfidf_vectorizer = TfidfVectorizer(tokenizer=self.tokenizeAndStemStrings, stop_words='english',ngram_range=(1,4), use_idf=True, smooth_idf = True, norm=None)
         tfidf = tfidf_vectorizer.fit_transform(self.text_df['text_body'].apply(cleanString))
     
 #         if dump:
@@ -449,28 +452,33 @@ class Topics(object):
         return ne_list_no_dup
 
     def load(self):
+        with open('./data/tfidf_vectorizer002998.p', 'r') as f:
+        #with open('./data/tfidf_vectorizer0199_nf100.p', 'r') as f:
+            self.tfidf_vectorizer=pickle.load(f)
         
         # load tf-idf representation
-        with open('./data/tfidf_vectorizer.p', 'r') as f:
-            self.tfidf_vectorizer=pickle.load(f)
-        with open('./data/tfidf.p', 'r') as f:
+        with open('./data/tfidf002998.p', 'r') as f:
+        #with open('./data/tfidf0199_nf100.p', 'r') as f:
             self.tfidf=pickle.load(f)
+        #with open('./data/tfidf.p', 'r') as f:
+        #    self.tfidf=pickle.load(f)    
         
         # load tf representation
-        with open('./data/tf_vectorizer.p', 'r') as f:
-            self.tf_vectorizer=pickle.load(f)
-        with open('./data/tf.p', 'r') as f:
-            self.tf=pickle.load(f)
+        #with open('./data/tf_vectorizer.p', 'r') as f:
+        #    self.tf_vectorizer=pickle.load(f)
+        #with open('./data/tf.p', 'r') as f:
+        #    self.tf=pickle.load(f)
         #self.feature_names=self.tf_vectorizer.get_feature_names()
         
         # load LDA model
-        with open('./data/lda.p', 'r') as f:
-            self.lda=pickle.load(f)
+        #with open('./data/lda.p', 'r') as f:
+        #    self.lda=pickle.load(f)
         
         # load keywords and named entities
-        #loc2='/home/ryan/Documents/FBT_corpus/processed-11-11-17.json'
+        #loc2='./data/all_reports_processed.json'  #this is full corpus
         loc1='./data/all_reports_processed2.json'
         self.processed_df = pd.read_json(loc1)
+        
         
         print "Corpus has %s documents" % len(self.processed_df)
   
@@ -535,7 +543,8 @@ class Topics(object):
         keyword_scores_array=np.array([float(keyword_scores_list_split[i]) if bool(keyword_scores_list_split[i]) else 0. for i in range(len(keyword_scores_list_split))])
            
         # generate array of years    
-        year_list=list(itertools.chain.from_iterable([[float(month)/12+float(year)]*len(keyword_list[doc_index]) for (month,year,doc_index) in zip(list(top_docs_nonempty['month']),list(top_docs_nonempty['year']),range(len(top_docs_nonempty)))]))
+        #year_list=list(itertools.chain.from_iterable([[float(month)/12+float(year)]*len(keyword_list[doc_index]) for (month,year,doc_index) in zip(list(top_docs_nonempty['month']),list(top_docs_nonempty['year']),range(len(top_docs_nonempty)))]))
+        year_list=list(itertools.chain.from_iterable([[float(year)]*len(keyword_list[doc_index]) for (year,doc_index) in zip(list(top_docs_nonempty['year']),range(len(top_docs_nonempty)))]))
         year_array=np.round(np.array(year_list),2)
         
         # generate list of tf-idf scores
@@ -574,20 +583,45 @@ class Topics(object):
               
         print 'Found ' + str(len(top_docs)) + ' documents relevant to query "' + query + '"' 
         #self.search_results=zip(year_list,keyword_list_all,keyword_scores_array,doc_tfidf_score_array)
-        self.search_results={'year': year_list, 'keywords': keyword_list_all,'TR_score':keyword_scores_array,'tfidf_score':doc_tfidf_score_array}
-                  
+        self.search_results={'year': year_array, 'keywords': np.array(keyword_list_all),'TR_score':keyword_scores_array,'tfidf_score':doc_tfidf_score_array}
+        self.search_results_status=0          
 
-    def formatSearchResults(self,format='tfidf_tf_product'):
+    def formatSearchResults(self,format='tfidf_tf_product',return_top_n=0):
         
         if format == 'tfidf_tf_product':
-            
-            # make a list of years that each keyword was cited
-            data=self.search_results
-
             #make a list of scores 100*(tfidf score)*(textrank score)/max for each keyword
-            data['total_score']=100*np.multiply(data['TR_score'],data['tfidf_score'])/(data['TR_score'].max()*data['tfidf_score'].max())
-
-        return data
+            
+            keys_to_sort=['year','keywords','TR_score','tfidf_score','total_score']
+            if self.search_results_status==0:
+                self.search_results['total_score']=100*np.multiply(self.search_results['TR_score'],self.search_results['tfidf_score'])/(self.search_results['TR_score'].max()*self.search_results['tfidf_score'].max())
+                sorted_args=np.argsort(self.search_results['total_score'])[::-1]
+                self.search_results['total_score']=self.search_results['total_score'][sorted_args]
+                self.search_results[keys_to_sort[0]]=self.search_results[keys_to_sort[0]][sorted_args]
+                self.search_results[keys_to_sort[1]]=list(np.array(self.search_results[keys_to_sort[1]])[sorted_args])
+                self.search_results[keys_to_sort[2]]=self.search_results[keys_to_sort[2]][sorted_args]
+                self.search_results[keys_to_sort[3]]=self.search_results[keys_to_sort[3]][sorted_args]
+                self.search_results_status=1 #indicates that the data is already sorted
+                #data_sorted={key :data[key][sorted_args] for key in keys_to_sort}
+            if bool(return_top_n):
+                return_data={'year':[],'keywords':[],'TR_score':[],'tfidf_score':[],'total_score':[]}
+                return_data[keys_to_sort[0]]=self.search_results[keys_to_sort[0]][:return_top_n]
+                return_data[keys_to_sort[1]]=self.search_results[keys_to_sort[1]][:return_top_n]
+                return_data[keys_to_sort[2]]=self.search_results[keys_to_sort[2]][:return_top_n]
+                return_data[keys_to_sort[3]]=self.search_results[keys_to_sort[3]][:return_top_n]
+                return_data[keys_to_sort[4]]=self.search_results[keys_to_sort[4]][:return_top_n]
+            else:
+                return_data=self.search_results
+                #data={self.search_results[key][:return_top_n] for key in keys_to_sort}
+        if format == 'integrate_score':
+            if self.search_results_status==1:
+                years_floor=np.floor(self.search_results['year'])
+                years = range(int(years_floor.min()),int(years_floor.max()+1))
+                year_score=[sum(self.search_results['total_score'][years_floor==float(year)]) for year in years]
+                return_data={'year':np.array(years),'year_score':np.array(year_score)}
+            else: 
+                formatSearchResults(self,format='tfidf_tf_product',return_top_n=return_top_n)
+                                      
+        return return_data
         
 if __name__ == '__main__':
     print 'executed main'   
