@@ -1,5 +1,11 @@
 from BioTechTopics import Topics
-t=Topics() #about 2 minutes
-t.showTopicWordCloud(3,fs=(14,8))
-t.ww('cancer')
-print "test"
+t=Topics()
+t.getText()
+t.processCorpus()
+
+"""
+# cases where NE were removed: 2503 (Miles White), 2500 (Maurice Greenberg)
+for x in range(2500,2509):
+    ne_list,scored_kw_phrases=t.getNeScoreKw(x,show_removed=True)
+    print '\n'
+"""

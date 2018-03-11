@@ -15,13 +15,14 @@ def tokenizeAndStemStrings(text):
     stemmer = PorterStemmer()
     for item in tokens_no_sw:
         # this line converts strings to unicode, so here I do it explicitly
-        try:
-            stemmed.append(stemmer.stem(unicode(item)))
-        except:
-            stemmed.append(unicode(item)) # for example, stemmer can't stem aed because it expects a letter before a
-            print "stemmer skipped word: " + str(unicode(item))
+        #try:
+        stemmed.append(stemmer.stem(item))
+        #except:
+        #    stemmed.append(unicode(item)) # for example, stemmer can't stem aed because it expects a letter before a
+        #    print("stemmer skipped word: " + str(unicode(item)))
     
     return stemmed
 
 def cleanString(x):
-    return x.encode('ascii','ignore').translate(None, string.punctuation).replace('\n', ' ').replace('\r', ' ')
+    return x.translate(str.maketrans('','',string.punctuation)).replace('\n', ' ').replace('\r', ' ')
+    #return x.encode('ascii','ignore').translate(None, string.punctuation).replace('\n', ' ').replace('\r', ' ')

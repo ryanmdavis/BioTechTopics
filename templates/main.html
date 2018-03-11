@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.css" type="text/css" />
+    <script type="text/javascript" src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.14.min.js"></script>
+    {{ script | safe }}
+  </head>
+  <body>
+    <div class=page>
+      <h1>Who's Who in BioTech?</h1>
+      <div class=query>
+      	<form id='userinput' method='post' action='index'>
+      		<p>
+      			Query: <input type='text' name='query' />
+      		</p>
+      		
+      	</form
+      </div>
+      {{ div | safe }}
+      
+      
+    </div>
+  </body>
+</html>

@@ -12,7 +12,7 @@ import itertools
 import pandas as pd
 import time
 #from wordcloud import WordCloud
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import pickle
 from BTT_functions import *
 
@@ -20,19 +20,63 @@ import imp
 
 # for some reason, Bokeh can't find wordcloud module
 #f, filename, description = imp.find_module('wordcloud')
-wordcloud = imp.load_module('wordcloud', None, '/home/ryan/Dropbox/Code/Virtual-Environments/ds_py27_env/lib/python2.7/site-packages/wordcloud', ('', '', 5))
-from wordcloud import WordCloud
+#wordcloud = imp.load_module('wordcloud', None, '/home/ryan/Dropbox/Code/Virtual-Environments/ds_py27_env/lib/python2.7/site-packages/wordcloud', ('', '', 5))
+#from wordcloud import WordCloud
 
 class Topics(object):
     
     def __init__(self):
-        plt.ion()
+        #plt.ion()
         # self.getText()
         self.topic_titles=['Blood tests and healthcare payers','Microbiome and Bacteria','New Drugs','Clinical Drug Development','Immunotherapies',' ','Health Data',' ','Devices and Diagnostics','Topic 9',]
     
-        print '\nTopics instance ready'
+        print('\nTopics instance ready')
     # code from https://github.com/amueller/word_cloud/blob/master/examples/simple.py
     
+    def getNeScoreKw(self,doc_num,show_removed=False):
+        keyword_list = self.getKeywordsByTextRank({str(doc_num):-1}, [doc_num], syntactic_filter='Filt: {<NN.*>}')[0]
+        tokens = nltk.word_tokenize(cleanString(self.text_df['text_body'][doc_num]))
+        tagged = nltk.pos_tag(tokens)
+        ne_list=self.ne(tagged) #named entities
+        np_list=self.nps(tagged) #noun phrases
+        ne_list_clean=self.intersectAndCleanNeNp(ne_list,np_list,keyword_list)
+        scored_kw_phrases=self.scoreNeNp(ne_list_clean,np_list,keyword_list)
+        scored_kw_phrases_cleaned=self.removeRedundantKwp(scored_kw_phrases,keyword_list,show_removed=show_removed) #this is good but it still removes some named entities
+        return ne_list,scored_kw_phrases_cleaned
+    
+    def removeRedundantKwp(self,scored_kw_phrases,keyword_lists,show_removed=False):
+        # make sure each kw only appears once per document
+        # Process:
+        # 1) Find the most common word in the entire keyword list. (using Counter)
+        # 2) For that keyword, iterate through all keyword phrases with that keyword, calculating the sum of textrank scores for all words in the phrase
+        keyword_dict={key: value for (key,value) in keyword_lists}
+        shortened_scored_kw_phrase_list=[]
+        remaining_kw_phrases=[kw_phrase[0] for kw_phrase in scored_kw_phrases]
+        while bool(remaining_kw_phrases):
+            counted_kw=Counter(list(itertools.chain.from_iterable([kw_phrase.split('_') for kw_phrase in remaining_kw_phrases])))
+            mc_kw=counted_kw.most_common(1)[0][0] # most common keyword
+            kw_phrases_with_mc_kw = [scored_kw_phrase[0] for scored_kw_phrase in scored_kw_phrases if mc_kw in scored_kw_phrase[0]]
+            
+            # sum up the tr score for all words within each element of the kw_phrases_with_mc_kw list
+            total_tr_score_list=np.array([np.array([keyword_dict[word.lower()] for word in set(kw_phrases_with_mc_kw[phrase_num].split('_')) if word.lower() in keyword_dict.keys()]).sum() for phrase_num in range(len(kw_phrases_with_mc_kw))])
+            
+            # best keyword
+            shortened_scored_kw_phrase_list.append(kw_phrases_with_mc_kw[total_tr_score_list.argmax()].replace('_',' ',))
+            
+            # remove a keyword (phrase) if any words in the keyword phrase contain the most common keyword (mc_kw)
+            remaining_kw_phrases=[phrase for phrase in remaining_kw_phrases if not bool(np.sum(np.array([mc_kw in word for word in phrase.split('_')])))]
+        
+        # now reassign the kw score to the shortened list
+        scored_kw_phrase_dict={scored_kw_phrase[0].replace('_',' '):scored_kw_phrase[1] for scored_kw_phrase in scored_kw_phrases if scored_kw_phrase[0].replace('_',' ') in shortened_scored_kw_phrase_list}
+        
+        if show_removed:
+            all_phrases=[kw_phrase[0] for kw_phrase in scored_kw_phrases]
+            removed = [phrase.replace('_',' ') for phrase in all_phrases if phrase.replace('_',' ') not in shortened_scored_kw_phrase_list]
+            print("Removed: ", removed)
+            print("Not Removed: ", shortened_scored_kw_phrase_list)
+            
+        return scored_kw_phrase_dict
+
     def processCorpus(self,save_file_loc='./data/all_data_processed.json'):
         
         # basic progress bar
@@ -43,67 +87,80 @@ class Topics(object):
         print("Progress:\n|" + "-"*num_dashes + "|")
         sys.stdout.write("|")
         
+        # figure out number of docs
+        if len(self.text_df.shape)==1:
+            num_docs=1
+        else:
+            num_docs=len(self.text_df)
+        
         # allocate some memory for new data frame
-        new_df= pd.DataFrame({'TR_keywords':['']*df_len,'TR_keyword_scores':['']*df_len,'year':['']*df_len,'month':['']*df_len,'NE':['']*df_len,'FBT_keywords':['']*df_len,'doc_num':['']*df_len,'author':['']*df_len,'title':['']*df_len})
-        for doc_num in range(len(self.text_df)):
+        new_df= pd.DataFrame({'TR_keywords':['']*df_len,'TR_keyword_scores':['']*df_len,'year':['']*df_len,'month':['']*df_len,'NE':['']*df_len,'FBT_keywords':['']*df_len,'doc_num':['']*df_len,'author':['']*df_len,'title':['']*df_len,'abs_url':['']*df_len})
+        for doc_num in range(num_docs):
+            # progress bar:
             if doc_num>docs_per_dash*dash_num:
                 sys.stdout.write("-")
+                sys.stdout.flush()
                 dash_num+=1
-            
+            # do the ne, kw, np extraction
+            doc_is_not_empty=False
+            if num_docs>1: #if there is more than one row
+                doc_is_not_empty=len(self.text_df.iloc[doc_num]['text_body'])>1
+            else:
+                doc_is_not_empty=bool(len(self.text_df['text_body']))
             try:
-                keyword_list = self.getKeywordsByTextRank({str(doc_num):10}, [doc_num], syntactic_filter='Filt: {<NN.*>}')[0]
-                #tokens = nltk.word_tokenize(self.text_df['text_body'][doc_num].encode('utf-8','ignore').decode('utf-8'))
-                tokens = nltk.word_tokenize(cleanString(self.text_df['text_body'][doc_num]))
-                tagged = nltk.pos_tag(tokens)
-                ne_list=self.ne(tagged) #named entities
-                np_list=self.nps(tagged) #noun phrases
-                scored_kw_phrases=self.scoreNeNp(ne_list,np_list,keyword_list)
-            
-            # now assign the keywords to the dataframe columns
-            
-                new_df['TR_keywords'][doc_num]=','.join([scored_kw_phrases[x][0] for x in range(len(scored_kw_phrases))])
-                new_df['TR_keyword_scores'][doc_num]=','.join([str(scored_kw_phrases[x][1]) for x in range(len(scored_kw_phrases))])
-                new_df['NE'][doc_num]=','.join(ne_list)
-                new_df['FBT_keywords'][doc_num]=','.join(self.text_df['keywords'][doc_num]).replace(' ','_')
-                new_df['doc_num'][doc_num]=doc_num
-                new_df['month'][doc_num]=str(self.text_df['date'][doc_num])[5:7]
-                new_df['author'][doc_num]=self.text_df['author'][doc_num]
-                new_df['year'][doc_num]=float(str(self.text_df['date'][doc_num])[0:4])+float(str(self.text_df['date'][doc_num])[5:7])/12.+float(str(self.text_df['date'][doc_num])[8:10])/365
-                new_df['title'][doc_num]=self.text_df['title'][doc_num]
+                if doc_is_not_empty: # if the document is not empty
+                    ne_list,scored_kw_phrases=self.getNeScoreKw(doc_num)
+                    # now assign the keywords to the dataframe columns
+                    #new_df['TR_keywords'][doc_num]=','.join([scored_kw_phrases[x][0] for x in range(len(scored_kw_phrases))])
+                    #new_df['TR_keyword_scores'][doc_num]=','.join([str(scored_kw_phrases[x][1]) for x in range(len(scored_kw_phrases))])
+                    keys=scored_kw_phrases.keys()
+                    new_df['TR_keywords'][doc_num]=','.join(keys)
+                    new_df['TR_keyword_scores'][doc_num]=','.join([str(scored_kw_phrases[key]) for key in keys])
+                    new_df['NE'][doc_num]=','.join(ne_list)
+                    new_df['FBT_keywords'][doc_num]=','.join(self.text_df['keywords'][doc_num]).replace(' ','_')
+                    new_df['doc_num'][doc_num]=doc_num
+                    new_df['month'][doc_num]=str(self.text_df['date'][doc_num])[5:7]
+                    new_df['author'][doc_num]=self.text_df['author'][doc_num]
+                    new_df['year'][doc_num]=float(str(self.text_df['date'][doc_num])[0:4])+float(str(self.text_df['date'][doc_num])[5:7])/12.+float(str(self.text_df['date'][doc_num])[8:10])/365
+                    new_df['title'][doc_num]=self.text_df['title'][doc_num]
+                    new_df['abs_url'][doc_num]=self.text_df['abs_url'][doc_num]
+                else:
+                    new_df['TR_keywords'][doc_num]=''
+                    new_df['TR_keyword_scores'][doc_num]=''
+                    new_df['NE'][doc_num]=''
+                    new_df['year'][doc_num]=0
+                    new_df['FBT_keywords'][doc_num]=''
+                    new_df['doc_num'][doc_num]=doc_num
+                    new_df['month'][doc_num]=''
+                    new_df['author'][doc_num]=''
+                    new_df['title'][doc_num]=''
+                    new_df['abs_url'][doc_num]=''
+                    print("Error at document number " + str(doc_num))
+                    print("\nProgress:\n|" + "-"*num_dashes + "|")
+                    sys.stdout.write("|")
+                    sys.stdout.write("-"*dash_num)
             except:
-                new_df['TR_keywords'][doc_num]=''
-                new_df['TR_keyword_scores'][doc_num]=''
-                new_df['NE'][doc_num]=''
-                new_df['year'][doc_num]=0
-                new_df['FBT_keywords'][doc_num]=''
-                new_df['doc_num'][doc_num]=doc_num
-                new_df['month'][doc_num]=''
-                new_df['author'][doc_num]=''
-                new_df['title'][doc_num]=''
-                print "Error at document number " + str(doc_num)
-                print("\nProgress:\n|" + "-"*num_dashes + "|")
-                sys.stdout.write("|")
-                dash_num+=1
-                sys.stdout.write("-"*dash_num)
+                print('Error on text:')
+                print(self.text_df.iloc[doc_num]['text_body'])
         sys.stdout.write("|\n")
         new_df.to_json(save_file_loc)
         
-    def showTopicWordCloud(self,topic_number,fs=(6,4)):
-        
-        if topic_number<0:
-            topic_number=0
-        elif topic_number>self.lda.n_topics-1:
-            topic_number=self.lda.n_topics-1       
-        
-        # Generate a word cloud image
-        wordcloud = WordCloud(max_words=self.n_top_words).generate(self.topic_words_text[topic_number])
-        
-        # Display the image:
-        plt.figure(figsize=fs)
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis("off")
-        plt.title(self.topic_titles[topic_number])
-        plt.show()
+#     def showTopicWordCloud(self,topic_number,fs=(6,4)):
+#         
+#         if topic_number<0:
+#             topic_number=0
+#         elif topic_number>self.lda.n_topics-1:
+#             topic_number=self.lda.n_topics-1       
+#         
+#         # Generate a word cloud image
+#         wordcloud = WordCloud(max_words=self.n_top_words).generate(self.topic_words_text[topic_number])
+#         
+#         # Display the image:
+#         plt.figure(figsize=fs)
+#         plt.imshow(wordcloud, interpolation='bilinear')
+#         plt.axis("off")
+#         plt.title(self.topic_titles[topic_number])
+#         plt.show()
          
         
     def performLDA(self,n_topics):
@@ -148,13 +205,15 @@ class Topics(object):
                 pass
         return keyword_list
     
-    def getText(self,json_file_loc='./data/all_reports.json',num_files=0):
+    def getText(self,json_file_loc='./data/all_reports.json',num_files=0,file_nums=0):
         # parse all of the JSON objects in the file.
-        if not bool(num_files):
+        if not bool(num_files) and not bool(file_nums):
             self.text_df = pd.read_json(json_file_loc)
+        elif bool(num_files):
+            self.text_df = pd.read_json(json_file_loc).iloc[0:(num_files-1)]
         else:
-            self.text_df = pd.read_json(json_file_loc)[0:num_files]
-        print 'Corpus contains ' + str(self.text_df.shape[0]) + ' unique files'
+            self.text_df = pd.read_json(json_file_loc).iloc[file_nums]
+        print('Corpus contains ' + str(self.text_df.shape[0]) + ' unique files')
     
     def tokenizeAndStemStrings(self,text):
         
@@ -184,19 +243,7 @@ class Topics(object):
                     
         tfidf_vectorizer = TfidfVectorizer(tokenizer=self.tokenizeAndStemStrings, stop_words='english',ngram_range=(1,4), use_idf=True, smooth_idf = True, norm=None)
         tfidf = tfidf_vectorizer.fit_transform(self.text_df['text_body'].apply(cleanString))
-    
-#         if dump:
-#             f = open('./data/tfidf_vectorizer.p', 'w')
-#             pickle.dump(tfidf_vectorizer,f)
-#             f.close()
-#             f = open('./data/tfidf.p', 'w')
-#             pickle.dump(tfidf,f)
-#             f.close()
-        #return tfs, tfidf
-        
-        #self.tfidf_vectorizer=tfidf_vectorizer
-        #self.tfidf=tfidf
-        
+            
         return tfidf_vectorizer,tfidf
 
     def getKeywordsByTextRank(self, num_keywords_to_choose_dict, doc_indicies, syntactic_filter=None):
@@ -215,7 +262,8 @@ class Topics(object):
             else:
                 text_filtered = cleanString(self.text_df['text_body'][doc_index])
             # run the TextRank algorithm
-            kw=self.summaKeywords(text_filtered,self.text_df['text_body'][doc_index].encode('ascii','ignore'), ratio=0.2, words=None, language="english", split=False, scores=True)
+            #kw=self.summaKeywords(text_filtered,self.text_df['text_body'][doc_index].encode('ascii','ignore'), ratio=0.2, words=None, language="english", split=False, scores=True)
+            kw=self.summaKeywords(text_filtered,self.text_df['text_body'][doc_index], ratio=0.2, words=None, language="english", split=False, scores=True)
             kw_list=[kw[x][0] for x in range(len(kw))]
                      
             # determine number of keywords to generate
@@ -258,6 +306,7 @@ class Topics(object):
         keywords_out = keywords._get_keywords_with_score(extracted_lemmas, lemmas_to_word)
     
         # text.split() to keep numbers and punctuation marks, so separeted concepts are not combined
+        # note that text_original.split() yields byte-typoe objects (b'xxx') which results in the problem
         combined_keywords = keywords._get_combined_keywords(keywords_out, text_original.split())
     
         return keywords._format_results(keywords_out, combined_keywords, split, scores)
@@ -329,61 +378,26 @@ class Topics(object):
             for node in t:
                 np_list = self.traverse_np(node,np_list)
         return np_list
-
-#     def getKeywordsByTfidf(self,regexps_list,num_keywords_to_choose_array):
-#         # Inputs:
-#         #    num_keywords_to_choose_array: if positive then function will return that many keywords, if negative value L then return len(regexps_list)/|L| keywords
-#     
-#         
-#         # allocate some memory for keywords
-#         keywords = [[]]*len(regexps_list)
-#         
-#         # define stemmer
-#         stemmer=PorterStemmer()
-#         
-#         # get feature names (i.e. potential keywords) and assign idf to a dictionary
-#         feature_names=self.tfidf_vectorizer.get_feature_names()
-#         idf=self.tfidf_vectorizer.idf_-1
-#         idf_dict={feature_names[x]:idf[x] for x in range(len(feature_names))}
-#         
-#         for doc_num in range(len(regexps_list)):
-#             # calculate term frequencies
-#             c=Counter(regexps_list[doc_num])
-#             term_list=c.most_common()
-#             # tf_dict={' '.join([stemmer.stem(w) for w in nltk.word_tokenize(term_list[x][0]) if not w in stopwords.words('english')]): term_list[x][1] for x in range(len(term_list))}
-#             tf_dict={' '.join([stemmer.stem(w) for w in nltk.word_tokenize(term_list[x][0]) if not w in stopwords.words('english')]): term_list[x][1] for x in range(len(term_list)) if term_list[x][0] in idf_dict}
-#         
-#             # now calculate tf-idf
-#             tfidf_dict={key: idf_dict[key]*tf_dict[key] for key in tf_dict.keys()}
-#             if num_keywords_to_choose_array[doc_num] >= 0:
-#                 num_keywords_to_choose=num_keywords_to_choose_array[doc_num]
-#             else:
-#                 num_keywords_to_choose=int(max(len(tfidf_dict)/abs(num_keywords_to_choose_array[doc_num]),1))
-#             sorted_tfidf_keys=sorted(tfidf_dict.iteritems(),key=operator.itemgetter(1),reverse=True)[0:num_keywords_to_choose]
-#             
-#             keywords[doc_num]=[sorted_tfidf_keys[x][0] for x in range(len(sorted_tfidf_keys))]
-#             
-#         return keywords
     
-    def showWhosWhoWordCloud(self,ww_list,query): 
-        # Generate a word cloud image
-        ww_text=" ".join(ww_list)
-        wordcloud = WordCloud(max_words=100).generate(ww_text)
-        
-        # Display the generated image:
-        # the matplotlib way:
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis("off")
-        plt.title("Who's who for query \"" + query + "\"")
-        plt.show()
-        print "Who's who:" + " ,".join(ww_list[0:15])
+#     def showWhosWhoWordCloud(self,ww_list,query): 
+#         # Generate a word cloud image
+#         ww_text=" ".join(ww_list)
+#         wordcloud = WordCloud(max_words=100).generate(ww_text)
+#         
+#         # Display the generated image:
+#         # the matplotlib way:
+#         plt.imshow(wordcloud, interpolation='bilinear')
+#         plt.axis("off")
+#         plt.title("Who's who for query \"" + query + "\"")
+#         plt.show()
+#         print("Who's who:" + " ,".join(ww_list[0:15]))
 
 
     def ne(self,tagged):
         ne_tree = nltk.chunk.ne_chunk(tagged)
         ne_list = self.traverse_ne(ne_tree, ne_type="PERSON",ne_list=[]) + self.traverse_ne(ne_tree, ne_type="ORGANIZATION",ne_list=[])
         ne_list = list(set(ne_list)) # remove duplicates
-        ne_list = [ne_list[x].lower() for x in range(len(ne_list))]
+        #ne_list = [ne_list[x].lower() for x in range(len(ne_list))]
         return ne_list
     
     # identify noun phrases from POS-tagged text
@@ -397,8 +411,8 @@ class Topics(object):
         cp=nltk.RegexpParser(pnp_grammar)
         chunked_text=cp.parse(tagged)
         np_list=self.traverse_np(chunked_text,np_list=[])
-        np_list_lower=[np_list[x].lower() for x in range(len(np_list))]
-        return np_list_lower
+        #np_list_lower=[np_list[x].lower() for x in range(len(np_list))]
+        return np_list
     
     def scoreNeNp(self,ne_list,np_list,keyword_list):
         
@@ -410,19 +424,18 @@ class Topics(object):
         ne_phrase_list=list(set(itertools.chain(*ne_phrase_list)))
         
         # for each NE phrase, assign it a score equal to the highest TextRank score among all words in the phrase
-        tr_scores = [keyword_dict[key] for key in ne_phrase_list[0].split(' ') if key in keyword_dict.keys()]
+        # tr_scores = [[keyword_dict[key] for key in [s.lower() for s in ne_phrase_list[ne_num].split(' ')] if key in keyword_dict.keys()] for ne_num in range(len(ne_phrase_list))]
         
         # change spaces in ne phrases to underscores so they can be made into keys
         # kwp_score = keyword_phrase score
         kwp_score=[]
         for ne_phrase_num in range(len(ne_phrase_list)):
-            score_list=[keyword_dict[key] for key in ne_phrase_list[ne_phrase_num].split(' ') if key in keyword_dict.keys()]
+            score_list=[keyword_dict[key] for key in [word.lower() for word in ne_phrase_list[ne_phrase_num].split(' ')] if key in keyword_dict.keys()]
             if len(score_list)==0: score_list=[0]
             kwp_score.append(np.max(np.array(score_list)))
         
         # remove phrases that have Textrank score = 0, since they are not keywordy enough to keep
         kwp_score_nonzero=[(ne_phrase_list[x].replace(' ','_'),kwp_score[x]) for x in range(len(kwp_score)) if kwp_score[x]>0]
-        
         
         return kwp_score_nonzero
     
@@ -451,13 +464,13 @@ class Topics(object):
                 ne_list_no_dup.append(ne_keyword_phrase_list[x])
         return ne_list_no_dup
 
-    def load(self):
-        with open('./data/tfidf_vectorizer002998.p', 'r') as f:
+    def load(self,data_loc='../data/'):
+        with open(data_loc+'tfidf_vectorizer.p', 'rb') as f:
         #with open('./data/tfidf_vectorizer0199_nf100.p', 'r') as f:
             self.tfidf_vectorizer=pickle.load(f)
         
         # load tf-idf representation
-        with open('./data/tfidf002998.p', 'r') as f:
+        with open(data_loc+'tfidf.p', 'rb') as f:
         #with open('./data/tfidf0199_nf100.p', 'r') as f:
             self.tfidf=pickle.load(f)
         #with open('./data/tfidf.p', 'r') as f:
@@ -476,19 +489,19 @@ class Topics(object):
         
         # load keywords and named entities
         #loc2='./data/all_reports_processed.json'  #this is full corpus
-        loc1='./data/all_reports_processed2.json'
-        self.processed_df = pd.read_json(loc1)
+        loc1='all_data_processed.json'
+        self.processed_df = pd.read_json(data_loc+loc1)
         
         
-        print "Corpus has %s documents" % len(self.processed_df)
+        print("Corpus has %s documents" % len(self.processed_df))
   
     ## WhosWho? function.  Uses keyword extraction, named entity recognition, and tfidf information retrieval to 
     ## Identify prominent individuals relevant to a user's query    
     def ww2(self,query):
         
         ## set default ascii encoding
-        reload(sys)
-        sys.setdefaultencoding('utf8')
+        #reload(sys)
+        #sys.setdefaultencoding('utf8')
         
         ## define grammars
         g1='{(<JJ>* <NN.*>+<IN>)? <JJ>* <NN.*>+}'
@@ -527,7 +540,7 @@ class Topics(object):
         
         # now put all of the keywords, scores in to a dictionary with year tags
         top_docs_nonempty = top_docs[top_docs['year']>0]
-        years=[str(year) for year in set(top_docs_nonempty['year'])]
+        #years=[str(year) for year in set(top_docs_nonempty['year'])]
         kw_score_dict={}
         
         # generate list of keywords
@@ -543,85 +556,69 @@ class Topics(object):
         keyword_scores_array=np.array([float(keyword_scores_list_split[i]) if bool(keyword_scores_list_split[i]) else 0. for i in range(len(keyword_scores_list_split))])
            
         # generate array of years    
-        #year_list=list(itertools.chain.from_iterable([[float(month)/12+float(year)]*len(keyword_list[doc_index]) for (month,year,doc_index) in zip(list(top_docs_nonempty['month']),list(top_docs_nonempty['year']),range(len(top_docs_nonempty)))]))
         year_list=list(itertools.chain.from_iterable([[float(year)]*len(keyword_list[doc_index]) for (year,doc_index) in zip(list(top_docs_nonempty['year']),range(len(top_docs_nonempty)))]))
         year_array=np.round(np.array(year_list),2)
+
+        # generate list of urls
+        url_list=np.array(list(itertools.chain.from_iterable([[url]*len(keyword_list[doc_index]) for (url,doc_index) in zip(list(top_docs_nonempty['abs_url']),range(len(top_docs_nonempty)))])))
         
         # generate list of tf-idf scores
         all_doc_indicies=list(top_docs_nonempty['doc_num'])
         doc_score_list=[[cosine_similarities[all_doc_indicies[doc_index]]]*len(keyword_list[doc_index]) for doc_index in range(len(all_doc_indicies))]
         doc_tfidf_score_array=np.array(list(itertools.chain.from_iterable(doc_score_list)))
         
-        # double check later, but I probably don't need to loop through the years like this
-#         for year in years:
-#             docs_year=top_docs[top_docs['year']==int(year)]
-#             keyword_list_all=[]
-#             keyword_scores_list_all=[]
-#             
-#             
-#             
-#             # make list of keywords
-#             keyword_list=list(docs_year['TR_keywords'])
-#             keyword_list=[keyword_list[x].replace('_',' ').split(',') for x in range(len(keyword_list))]
-#             keyword_list_all.extend(list(itertools.chain.from_iterable(keyword_list)))
-#             
-#             #make list of keyword scores
-#             keyword_scores_list=list(docs_year['TR_keyword_scores'])
-#             keyword_scores_list_split=[keyword_scores_list[x].replace('_',' ').split(',') for x in range(len(keyword_scores_list))]
-#             #keyword_scores_list_all_unicode=list(itertools.chain.from_iterable(keyword_scores_list_split))
-#             keyword_scores_list_all=[float(score) if len(score)>0 else 0 for score in list(itertools.chain.from_iterable(keyword_scores_list_split))]
-#             #keyword_scores_list_all.extend([float(score) for score in list(itertools.chain.from_iterable(keyword_scores_list))])
-#             
-#             doc_score_list_all=[]
-#             this_year_doc_indicies=list(docs_year['doc_num'])
-#             for doc_num in range(len(docs_year)):
-#                 doc_score_list_all.extend([cosine_similarities[this_year_doc_indicies[doc_num]]]*len(keyword_list[doc_num]))
-#                 #make list of keyword scores 
-#             
-#             month_list = list(docs_year['month'])
-#             year_list.extend(np.array([float(month) for month in month_list])/12.+float(year))
-              
-        print 'Found ' + str(len(top_docs)) + ' documents relevant to query "' + query + '"' 
+        # match each returned result with a doc index
+        doc_num_list=list(itertools.chain.from_iterable([[all_doc_indicies[doc_index]]*len(keyword_list[doc_index]) for doc_index in range(len(top_docs_nonempty))]))
+        
+        print('Found ' + str(len(top_docs)) + ' documents relevant to query "' + query + '"') 
         #self.search_results=zip(year_list,keyword_list_all,keyword_scores_array,doc_tfidf_score_array)
-        self.search_results={'year': year_array, 'keywords': np.array(keyword_list_all),'TR_score':keyword_scores_array,'tfidf_score':doc_tfidf_score_array}
+        self.search_results={'year': year_array, 'keywords': np.array(keyword_list_all),'TR_score':keyword_scores_array,'tfidf_score':doc_tfidf_score_array,'doc_num':np.array(doc_num_list),'abs_url':url_list}
         self.search_results_status=0          
 
-    def formatSearchResults(self,format='tfidf_tf_product',return_top_n=0):
+    def formatSearchResults(self,output_format='tfidf_tf_product',return_top_n=0):
         
-        if format == 'tfidf_tf_product':
+        empty_data={'abs_url':np.array([]), 'total_score':np.array([]), 'year':np.array([]), 'keywords':np.array([]), 'TR_score':np.array([]), 'doc_num':np.array([]), 'tfidf_score':np.array([])}
+        
+        if output_format == 'tfidf_tf_product':
             #make a list of scores 100*(tfidf score)*(textrank score)/max for each keyword
-            
-            keys_to_sort=['year','keywords','TR_score','tfidf_score','total_score']
-            if self.search_results_status==0:
-                self.search_results['total_score']=100*np.multiply(self.search_results['TR_score'],self.search_results['tfidf_score'])/(self.search_results['TR_score'].max()*self.search_results['tfidf_score'].max())
-                sorted_args=np.argsort(self.search_results['total_score'])[::-1]
-                self.search_results['total_score']=self.search_results['total_score'][sorted_args]
-                self.search_results[keys_to_sort[0]]=self.search_results[keys_to_sort[0]][sorted_args]
-                self.search_results[keys_to_sort[1]]=list(np.array(self.search_results[keys_to_sort[1]])[sorted_args])
-                self.search_results[keys_to_sort[2]]=self.search_results[keys_to_sort[2]][sorted_args]
-                self.search_results[keys_to_sort[3]]=self.search_results[keys_to_sort[3]][sorted_args]
-                self.search_results_status=1 #indicates that the data is already sorted
-                #data_sorted={key :data[key][sorted_args] for key in keys_to_sort}
-            if bool(return_top_n):
-                return_data={'year':[],'keywords':[],'TR_score':[],'tfidf_score':[],'total_score':[]}
-                return_data[keys_to_sort[0]]=self.search_results[keys_to_sort[0]][:return_top_n]
-                return_data[keys_to_sort[1]]=self.search_results[keys_to_sort[1]][:return_top_n]
-                return_data[keys_to_sort[2]]=self.search_results[keys_to_sort[2]][:return_top_n]
-                return_data[keys_to_sort[3]]=self.search_results[keys_to_sort[3]][:return_top_n]
-                return_data[keys_to_sort[4]]=self.search_results[keys_to_sort[4]][:return_top_n]
+            if self.search_results['TR_score'].size > 0:
+                #keys_to_sort=['year','keywords','TR_score','tfidf_score','total_score']
+                if self.search_results_status==0:
+                    self.search_results['total_score']=100*np.multiply(self.search_results['TR_score'],self.search_results['tfidf_score'])/(self.search_results['TR_score'].max()*self.search_results['tfidf_score'].max())
+                    sorted_args=np.argsort(self.search_results['total_score'])[::-1]
+                    self.search_results={key:self.search_results[key][sorted_args] for key in self.search_results.keys()}
+                    #self.search_results['total_score']=self.search_results['total_score'][sorted_args]
+                    #self.search_results[keys_to_sort[0]]=self.search_results[keys_to_sort[0]][sorted_args]
+                    #self.search_results[keys_to_sort[1]]=list(np.array(self.search_results[keys_to_sort[1]])[sorted_args])
+                    #self.search_results[keys_to_sort[2]]=self.search_results[keys_to_sort[2]][sorted_args]
+                    #self.search_results[keys_to_sort[3]]=self.search_results[keys_to_sort[3]][sorted_args]
+                    self.search_results_status=1 #indicates that the data is already sorted
+                    #data_sorted={key :data[key][sorted_args] for key in keys_to_sort}
+                if bool(return_top_n):
+                    #return_data={'year':[],'keywords':[],'TR_score':[],'tfidf_score':[],'total_score':[]}
+                    #return_data[keys_to_sort[0]]=self.search_results[keys_to_sort[0]][:return_top_n]
+                    #return_data[keys_to_sort[1]]=self.search_results[keys_to_sort[1]][:return_top_n]
+                    #return_data[keys_to_sort[2]]=self.search_results[keys_to_sort[2]][:return_top_n]
+                    #return_data[keys_to_sort[3]]=self.search_results[keys_to_sort[3]][:return_top_n]
+                    #return_data[keys_to_sort[4]]=self.search_results[keys_to_sort[4]][:return_top_n]
+                    return_data={key:self.search_results[key][:return_top_n] for key in self.search_results.keys()}
+                else:
+                    return_data=self.search_results
+                    #data={self.search_results[key][:return_top_n] for key in keys_to_sort}
             else:
-                return_data=self.search_results
-                #data={self.search_results[key][:return_top_n] for key in keys_to_sort}
-        if format == 'integrate_score':
+                return_data=empty_data
+                self.search_results_status=-1
+        if output_format == 'integrate_score':
             if self.search_results_status==1:
                 years_floor=np.floor(self.search_results['year'])
                 years = range(int(years_floor.min()),int(years_floor.max()+1))
                 year_score=[sum(self.search_results['total_score'][years_floor==float(year)]) for year in years]
                 return_data={'year':np.array(years),'year_score':np.array(year_score)}
-            else: 
-                formatSearchResults(self,format='tfidf_tf_product',return_top_n=return_top_n)
-                                      
+            elif self.search_results_status==-1:
+                return_data=empty_data
+            else:  
+                self.formatSearchResults(self,output_format='tfidf_tf_product',return_top_n=return_top_n)                         
         return return_data
         
 if __name__ == '__main__':
-    print 'executed main'   
+    print('executed main')   
