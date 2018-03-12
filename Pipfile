@@ -4,6 +4,7 @@ url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
+
 [dev-packages]
 
 
@@ -19,6 +20,7 @@ bokeh = "*"
 summa = {git = "https://github.com/summanlp/textrank"}
 flask = "*"
 "h5py" = "*"
+gunicorn = "*"
 
 
 [requires]
