@@ -13,7 +13,7 @@ from flask import Flask, render_template, request
 
 ## load biotech topics data
 t=Topics()
-t.load('/home/ryan/Dropbox/Code/BioTechTopics_Heroku_App_Py36/data/')
+t.load('./data/')
 t.ww2('antibiotic')
 data_scatter_dict = t.formatSearchResults(output_format='tfidf_tf_product',return_top_n=200)
 data_line_dict = t.formatSearchResults(output_format='integrate_score')
