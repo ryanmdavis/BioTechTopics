@@ -13,8 +13,8 @@ if __name__ == '__main__':
     print('executed main')  
 
     t=Topics()
-    t.getText(json_file_loc='/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports.json')
-    #t.processCorpus()
+    t.getText(json_file_loc='/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports.json',num_files=1000)
+    t.processCorpus()
     
     # train and save tfidf representation: 20 minutes
     print('\nTraining tf-idf Vectorizer')
