@@ -1,1 +1,6 @@
 /data_ignore/*
+
+
+venv
+*.pyc
+.ipynb_checkpoints
