@@ -1,1 +1,1 @@
-web: gunicorn bokeh_flask_btt:app --log-file -
+web: gunicorn bokeh_flask_btt:app_wwbt --log-file -
