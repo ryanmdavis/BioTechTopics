@@ -1,4 +1,4 @@
-import BioTechTopics as BTT
+from wwbt import BioTechTopics as BTT
 t=BTT.Topics() #about 2 minutes
 t.load(data_loc='./data/')
 t.ww2('cancer')
