@@ -103,7 +103,7 @@ def hello(name=None):
     else:
         print('get')
     script, div = components(p)
-    return render_template('main.html', script=script, div=div)
+    return render_template('index.html', script=script, div=div)
 
 if __name__ == "__main__":
     app_wwbt.run(debug=True)
