@@ -87,7 +87,11 @@ app_wwbt = Flask(__name__)
 # export to a html script for embedding in Flask
 #see: http://flask.pocoo.org/docs/0.12/quickstart/
 @app_wwbt.route('/',methods=['GET','POST'])
-def hello(name=None):
+def start(name=None):
+    render_template('index.html', script=script, div=div)
+    
+@app_wwbt.route('/index',methods=['GET','POST'])
+def index(name=None):
     if request.method == 'POST':
         print('post')
         t.ww2(request.form['query'])
