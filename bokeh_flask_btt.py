@@ -88,7 +88,7 @@ app_wwbt = Flask(__name__)
 #see: http://flask.pocoo.org/docs/0.12/quickstart/
 @app_wwbt.route('/',methods=['GET','POST'])
 def start(name=None):
-    render_template('index.html', script=script, div=div)
+    render_template('index.html')
     
 @app_wwbt.route('/index',methods=['GET','POST'])
 def index(name=None):
