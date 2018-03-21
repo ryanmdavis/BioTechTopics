@@ -110,6 +110,6 @@ def index(name=None):
     return render_template('index.html', script=script, div=div)
 
 if __name__ == "__main__":
-    app_wwbt.run(debug=True)
+    app_wwbt.run(port=33507)
 #curdoc().add_root(l)
 #curdoc().title = "Who's Who in Biotech?"
