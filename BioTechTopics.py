@@ -228,7 +228,7 @@ class Topics(object):
         stemmer = PorterStemmer()
         for item in tokens_no_sw:
             # this line converts strings to unicode, so here I do it explicitly
-            # RMD - i deleted the call to unicode surrounding "item" in the next line
+            # RMD - i deleted the call to unicode surrounding "item" in the next line 
             stemmed.append(stemmer.stem(item))
         
         return stemmed
