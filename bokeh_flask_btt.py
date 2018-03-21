@@ -73,7 +73,6 @@ for control in controls:
     control.on_change('value', lambda attr, old, new: update())
 
 sizing_mode = 'fixed'  # 'scale_width' also looks nice with this example
- 
 inputs = widgetbox(*controls, sizing_mode=sizing_mode)
 #update()  # initial load of the data
 
