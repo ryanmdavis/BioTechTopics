@@ -36,9 +36,11 @@ y_axis = Select(title="Y Axis", options=["Relevance"], value="Relevance")
 # Create Column Data Source that will be used by the plot
 scatter_source = ColumnDataSource(data=data_scatter_dict)
 line_source = ColumnDataSource(data=data_line_dict)
-    
+
+## set hovertool 
 hover = HoverTool(tooltips=[("Who? ", "@keywords")])
 
+## Define plot p
 p = figure(plot_height=400, plot_width=700, title="", toolbar_location=None, tools=[hover,"tap"])
 p.circle(x="year", y="total_score", source=scatter_source, size=12, line_color=None)
 p.xaxis.axis_label = "year"
@@ -47,13 +49,13 @@ p.title.text = "Each dot is a prominent Individual or Company related to your qu
 taptool=p.select(type=TapTool)
 taptool.callback=OpenURL(url="@abs_url")
 
+# Define plot p2
 p2 = figure(plot_height=200, plot_width=700, title="", toolbar_location=None)
 p2.line(x="year",y="year_score",source=line_source)
 p2.xaxis.axis_label="year"
 p2.yaxis.axis_label="normalized term frequency"
 
-#show(column(p,p2))
-
+## this function is called when user enters a new query
 def update():
     this_query = query_term.value.strip() if bool(query_term.value.strip()) else 'antibiotic'
     t.ww2(this_query)
@@ -73,16 +75,9 @@ for control in controls:
 sizing_mode = 'fixed'  # 'scale_width' also looks nice with this example
  
 inputs = widgetbox(*controls, sizing_mode=sizing_mode)
-#l = layout([
-#    [desc],
-#    [inputs, p],
-#    [p2]
-#], sizing_mode=sizing_mode)
-
-update()  # initial load of the data
+#update()  # initial load of the data
 
 # Flask portion:
-
 app_wwbt = Flask(__name__)
 # export to a html script for embedding in Flask
 #see: http://flask.pocoo.org/docs/0.12/quickstart/
@@ -111,5 +106,3 @@ def index(name=None):
 
 if __name__ == "__main__":
     app_wwbt.run(port=33507)
-#curdoc().add_root(l)
-#curdoc().title = "Who's Who in Biotech?"
