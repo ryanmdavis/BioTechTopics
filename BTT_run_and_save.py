@@ -5,7 +5,7 @@ from nltk.stem.porter import *
 #from nltk.corpus import stopwords
 import pickle
 from BioTechTopics import Topics
-from BTT_functions import *
+from BTT_functions import tokenizeAndStemStrings,cleanString
 #from sklearn.decomposition import LatentDirichletAllocation
 import time
 
@@ -13,7 +13,7 @@ if __name__ == '__main__':
     print('executed main')  
 
     t=Topics()
-    t.getText(json_file_loc='/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports.json',num_files=100)
+    t.getText(json_file_loc='/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports.json')
     t.processCorpus()
     
     # train and save tfidf representation: 20 minutes
