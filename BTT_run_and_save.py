@@ -14,12 +14,12 @@ if __name__ == '__main__':
 
     t=Topics()
     t.getText(json_file_loc='/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports.json')
-    t.processCorpus()
+    #t.processCorpus()
     
     # train and save tfidf representation: 20 minutes
     print('\nTraining tf-idf Vectorizer')
     start = time.time()
-    tfidf_vectorizer = TfidfVectorizer(tokenizer=tokenizeAndStemStrings, stop_words='english',ngram_range=(1,2), use_idf=True, smooth_idf = False, norm=None, min_df=0.002, max_df=0.998)    
+    tfidf_vectorizer = TfidfVectorizer(tokenizer=tokenizeAndStemStrings, stop_words='english',ngram_range=(1,1), use_idf=True, smooth_idf = False, norm=None, min_df=0.002, max_df=0.2)    
     tfidf = tfidf_vectorizer.fit_transform(t.text_df['text_body'].apply(cleanString))
     end = time.time()
     print('Done training after ' + str(end-start) + ' seconds')
