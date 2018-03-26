@@ -10,23 +10,23 @@ from BTT_functions import *
 import time
 
 if __name__ == '__main__':
-    print('executed main')  
+    print('executed main')
 
     t=Topics()
-    t.getText(json_file_loc='/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports.json',num_files=100)
-    t.processCorpus()
+    t.getText(json_file_loc='/home/ryan/Dropbox/Code/DataIncubatorChallenge/BioTechTopics/data/all_reports.json')
+    #t.processCorpus()
     
     # train and save tfidf representation: 20 minutes
     print('\nTraining tf-idf Vectorizer')
     start = time.time()
-    tfidf_vectorizer = TfidfVectorizer(tokenizer=tokenizeAndStemStrings, stop_words='english',ngram_range=(1,2), use_idf=True, smooth_idf = False, norm=None, min_df=0.002, max_df=0.998)    
+    tfidf_vectorizer = TfidfVectorizer(tokenizer=tokenizeAndStemStrings, stop_words='english',ngram_range=(1,2), use_idf=True, smooth_idf = False, norm=None, min_df=0.002, max_df=0.2)    
     tfidf = tfidf_vectorizer.fit_transform(t.text_df['text_body'].apply(cleanString))
     end = time.time()
     print('Done training after ' + str(end-start) + ' seconds')
     
-    with open('./data/tfidf_vectorizer.p', 'wb') as f:
+    with open('./data/tfidf_vectorizer_maxdf0_2.p', 'wb') as f:
         pickle.dump(tfidf_vectorizer,f)
-    with open('./data/tfidf.p', 'wb') as f:
+    with open('./data/tfidf_maxdf0_2.p', 'wb') as f:
         pickle.dump(tfidf,f)
     
     del tfidf_vectorizer,tfidf

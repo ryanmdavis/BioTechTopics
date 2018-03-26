@@ -77,7 +77,7 @@ class Topics(object):
             
         return scored_kw_phrase_dict
 
-    def processCorpus(self,save_file_loc='./data/all_data_processed.json'):
+    def processCorpus(self,save_file_loc='../data/all_data_processed.json'):
         
         # basic progress bar
         df_len=len(self.text_df)
@@ -143,25 +143,7 @@ class Topics(object):
                 print('Error on text:')
                 print(self.text_df.iloc[doc_num]['text_body'])
         sys.stdout.write("|\n")
-        new_df.to_json(save_file_loc)
-        
-#     def showTopicWordCloud(self,topic_number,fs=(6,4)):
-#         
-#         if topic_number<0:
-#             topic_number=0
-#         elif topic_number>self.lda.n_topics-1:
-#             topic_number=self.lda.n_topics-1       
-#         
-#         # Generate a word cloud image
-#         wordcloud = WordCloud(max_words=self.n_top_words).generate(self.topic_words_text[topic_number])
-#         
-#         # Display the image:
-#         plt.figure(figsize=fs)
-#         plt.imshow(wordcloud, interpolation='bilinear')
-#         plt.axis("off")
-#         plt.title(self.topic_titles[topic_number])
-#         plt.show()
-         
+        new_df.to_json(save_file_loc)   
         
     def performLDA(self,n_topics):
         self.lda = LatentDirichletAllocation(n_topics, max_iter=30, learning_method='online', learning_offset=50., random_state=0)
