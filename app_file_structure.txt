@@ -1,0 +1,29 @@
+Purpose: App runs at 600-800 Mb (why the range) but the maximum allowable is 500 Mb.  Purpose is to reduce the memory required.
+
+Approach: turn the app into a package with a the online and offline components separate.  The expected memory savings will come from not needing a lot of the big packages.
+
+Old packages needed:
+
+numpy = "*"
+scipy = "*"
+sklearn = "*"
+pandas = "*"
+nltk = "*"
+bokeh = "*"
+summa = {git = "https://github.com/summanlp/textrank"}
+Flask = "*"
+gunicorn = "*"
+Django = "*"
+
+New packages:
+pandas
+gunicorn
+bokeh
+Flask
+numpy
+
+
+Ommited packages
+scipy
+nltk
+summa
