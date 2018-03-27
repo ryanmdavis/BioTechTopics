@@ -1,0 +1,23 @@
+what is an easy way to integrate NLP training algorithms into web browsing.
+
+e.g.:
+PRoduct/user workflow:
+1) You install the "app" into chrome
+2) The app highlights a sentence that it needs manual input for learning algorithm.
+
+For example in the sentence "Basilea drops inhaled antibiotic, expands cancer 
+program in early-stage rejig".  Is this positive about antibiotics, how about
+cancer program?
+
+3) The user answers the question in a way that can be easily used for training algorithm.  For example, for sentiment analysis the user just clicks plus or minus.
+
+4) User gets a point. This points are financed by clients who pay for the training data results.
+
+Key value prop: Eventually people don't change their normal browsing habbits --> reach many more people, many more people will sign up/use.
+
+Another way to do it when there are fewer trainers is taht they click a button (think stumbleupon) and this takes them to a webpage that they then score.
+
+Crowdflower provides crowd-sourced training data
+
+Another idea:
+Use crowdflower to quantify (how much would you pay for 1 lb of this steak?) Use this to train an image processing algorithm that prices a steak (higher for better quailtiy, lower if it is likely to be thrown away)

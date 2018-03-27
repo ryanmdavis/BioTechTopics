@@ -4,3 +4,5 @@ venv_size.txt
 venv
 *.pyc
 .ipynb_checkpoints
+sizes.txt
+venv_size.txt
