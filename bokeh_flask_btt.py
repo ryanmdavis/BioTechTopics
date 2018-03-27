@@ -10,7 +10,7 @@ from bokeh.io import curdoc, show
 from BioTechTopics import Topics
 from bokeh.embed import components 
 from flask import Flask, render_template, request
-
+import string
 #test
 
 ## load biotech topics data
@@ -38,7 +38,7 @@ scatter_source = ColumnDataSource(data=data_scatter_dict)
 line_source = ColumnDataSource(data=data_line_dict)
 
 ## set hovertool 
-hover = HoverTool(tooltips=[("Who? ", "@keywords")])
+hover = HoverTool(tooltips=[("Who? ", "@keywords"),("Doc #","@doc_num")])
 
 ## Define plot p
 p = figure(plot_height=400, plot_width=700, title="", toolbar_location=None, tools=[hover,"tap"])
@@ -57,7 +57,7 @@ p2.yaxis.axis_label="normalized term frequency"
 
 ## this function is called when user enters a new query
 def update():
-    this_query = query_term.value.strip() if bool(query_term.value.strip()) else 'antibiotic'
+    this_query = query_term.value.strip().translate(None, string.punctuation) if bool(query_term.value.strip()) else 'antibiotic'
     t.ww2(this_query)
     x_name = axis_map[x_axis.value]
     y_name = axis_map[y_axis.value]
