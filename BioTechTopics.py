@@ -545,6 +545,9 @@ class Topics(object):
         # generate list of urls
         url_list=np.array(list(itertools.chain.from_iterable([[url]*len(keyword_list[doc_index]) for (url,doc_index) in zip(list(top_docs_nonempty['abs_url']),range(len(top_docs_nonempty)))])))
         
+        # generate list of titles
+        title_list=np.array(list(itertools.chain.from_iterable([[title]*len(keyword_list[doc_index]) for (title,doc_index) in zip(list(top_docs_nonempty['title']),range(len(top_docs_nonempty)))])))
+        
         # generate list of tf-idf scores
         all_doc_indicies=list(top_docs_nonempty['doc_num'])
         doc_score_list=[[cosine_similarities[all_doc_indicies[doc_index]]]*len(keyword_list[doc_index]) for doc_index in range(len(all_doc_indicies))]
@@ -553,9 +556,11 @@ class Topics(object):
         # match each returned result with a doc index
         doc_num_list=list(itertools.chain.from_iterable([[all_doc_indicies[doc_index]]*len(keyword_list[doc_index]) for doc_index in range(len(top_docs_nonempty))]))
         
+        
+        
         print('Found ' + str(len(top_docs)) + ' documents relevant to query "' + query + '"') 
         #self.search_results=zip(year_list,keyword_list_all,keyword_scores_array,doc_tfidf_score_array)
-        self.search_results={'year': year_array, 'keywords': np.array(keyword_list_all),'TR_score':keyword_scores_array,'tfidf_score':doc_tfidf_score_array,'doc_num':np.array(doc_num_list),'abs_url':url_list}
+        self.search_results={'year': year_array, 'keywords': np.array(keyword_list_all),'TR_score':keyword_scores_array,'tfidf_score':doc_tfidf_score_array,'doc_num':np.array(doc_num_list),'abs_url':url_list,'title':title_list}
         self.search_results_status=0          
 
     def formatSearchResults(self,output_format='tfidf_tf_product',return_top_n=0):

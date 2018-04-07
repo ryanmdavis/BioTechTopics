@@ -38,7 +38,7 @@ scatter_source = ColumnDataSource(data=data_scatter_dict)
 line_source = ColumnDataSource(data=data_line_dict)
 
 ## set hovertool 
-hover = HoverTool(tooltips=[("Who? ", "@keywords"),("Doc #","@doc_num")])
+hover = HoverTool(tooltips=[("Who? ", "@keywords"),("Context: ","@title")])
 
 ## Define plot p
 p = figure(plot_height=400, plot_width=700, title="", toolbar_location=None, tools=[hover,"tap"])
