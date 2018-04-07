@@ -20,4 +20,4 @@ Another way to do it when there are fewer trainers is taht they click a button (
 Crowdflower provides crowd-sourced training data
 
 Another idea:
-Use crowdflower to quantify (how much would you pay for 1 lb of this steak?) Use this to train an image processing algorithm that prices a steak (higher for better quailtiy, lower if it is likely to be thrown away)
+Use crowdflower to quantify (how much would you pay for 1 lb of this steak?) Use this to train an image processing algorithm that prices a steak (higher for better quailtiy, lower if it is likely to be thZZZZZZZZZZZZZZzz@@SSSSSS HHHHHHHHHJJJJJ V

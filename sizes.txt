@@ -1,8 +1,0 @@
-full corpus, ngram=(1,2), max_df=0.2, min_df=0.002
-all_data_processed.json = 21.2 Mb
-tfidf = 60.2 Mb
-tfidf_vectorizer = 61.6 Mb
-slug memory usage = 600-800 Mb
-
-
-full corpus, ngram=(1,1), max_df=0.2, min_df=0.002
