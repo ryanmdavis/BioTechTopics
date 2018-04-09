@@ -85,6 +85,7 @@ def start(name=None):
     default_query='antibiotics'
     t.ww2('antibiotics')
     scatter_source.data = t.formatSearchResults(output_format='tfidf_tf_product',return_top_n=int(num_results_slider.value))
+    p.title.text = "No results related to your query ''antibiotics''" 
     script, div = components(p)
     return render_template('index.html', script=script, div=div,text_value=default_query)
     
@@ -97,7 +98,7 @@ def index(name=None):
         
         #if search results are not empty:
         if scatter_source.data['abs_url'].size > 0:
-            p.title.text = "Each dot is a prominent Individual or Company related to your query :''" + request.form['query'] + "''"
+            p.title.text = "Each dot is a prominent Individual or Company related to your query ''" + request.form['query'] + "''"
             
         #if search results are empty:    
         else:
