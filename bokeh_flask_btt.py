@@ -82,7 +82,11 @@ app_wwbt = Flask(__name__)
 #see: http://flask.pocoo.org/docs/0.12/quickstart/
 @app_wwbt.route('/',methods=['GET','POST'])
 def start(name=None):
-    return render_template('index.html')
+    default_query='antibiotics'
+    t.ww2('antibiotics')
+    scatter_source.data = t.formatSearchResults(output_format='tfidf_tf_product',return_top_n=int(num_results_slider.value))
+    script, div = components(p)
+    return render_template('index.html', script=script, div=div,text_value=default_query)
     
 @app_wwbt.route('/index',methods=['GET','POST'])
 def index(name=None):
@@ -101,7 +105,7 @@ def index(name=None):
     else:
         print('get')
     script, div = components(p)
-    return render_template('index.html', script=script, div=div)
+    return render_template('index.html', script=script, div=div, text_value=request.form['query'])
 
 if __name__ == "__main__":
     app_wwbt.run(port=33507)
