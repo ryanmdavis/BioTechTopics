@@ -18,9 +18,10 @@ pandas = "*"
 nltk = "*"
 bokeh = "*"
 summa = {git = "https://github.com/summanlp/textrank"}
-Flask = "*"
+flask = "*"
 gunicorn = "*"
-Django = "*"
+django = "*"
+"jinja2" = "*"
 
 
 [requires]
